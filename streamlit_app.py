@@ -1,4 +1,4 @@
-import streamlit as st
+jimport streamlit as st
 import json
 import os
 
@@ -124,3 +124,4 @@ if st.button("Guardar jugador"):
 
     else:
         st.error("Escribe un nombre válido")
+        
