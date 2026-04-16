@@ -3,9 +3,9 @@ import json
 import os
 import pandas as pd
 
-st.set_page_config(page_title="App PRO de Apuestas", layout="centered")
+st.set_page_config(page_title="App DIOS de Apuestas", layout="centered")
 
-st.title("💰 App PRO de Apuestas")
+st.title("🔥 App DIOS de Apuestas")
 
 # =========================
 # ARCHIVOS
@@ -18,45 +18,47 @@ if not os.path.exists("historial.json"):
     with open("historial.json", "w") as f:
         json.dump([], f)
 
+if not os.path.exists("bankroll.json"):
+    with open("bankroll.json", "w") as f:
+        json.dump({"saldo": 100}, f)
+
 # =========================
 # CARGAR DATOS
 # =========================
-with open("jugadores.json", "r") as f:
-    jugadores = json.load(f)
+jugadores = json.load(open("jugadores.json"))
+historial = json.load(open("historial.json"))
+bankroll_data = json.load(open("bankroll.json"))
 
-with open("historial.json", "r") as f:
-    historial = json.load(f)
+saldo = bankroll_data["saldo"]
+
+st.metric("💰 Bankroll actual", f"${saldo:.2f}")
 
 # =========================
 # AGREGAR JUGADOR
 # =========================
-st.subheader("➕ Agregar jugador")
+st.subheader("➕ Nuevo jugador")
 
-col1, col2 = st.columns(2)
-
-with col1:
-    nombre = st.text_input("Nombre")
-
-with col2:
-    elo = st.number_input("ELO", value=1500)
-
+nombre = st.text_input("Nombre jugador")
+elo = st.number_input("ELO", value=1500)
 racha = st.number_input("Racha", value=0)
 
 if st.button("Guardar jugador"):
     if nombre != "":
         jugadores[nombre] = {"elo": elo, "racha": racha}
-        with open("jugadores.json", "w") as f:
-            json.dump(jugadores, f)
+        json.dump(jugadores, open("jugadores.json", "w"))
         st.success("Jugador guardado")
+
+# =========================
+# VALIDACIÓN
+# =========================
+if len(jugadores) < 2:
+    st.warning("Agrega al menos 2 jugadores")
+    st.stop()
 
 # =========================
 # SELECCIÓN
 # =========================
-st.subheader("🎯 Análisis de apuesta")
-
-if len(jugadores) < 2:
-    st.warning("Agrega al menos 2 jugadores")
-    st.stop()
+st.subheader("🎯 Nueva apuesta")
 
 lista = list(jugadores.keys())
 
@@ -64,20 +66,19 @@ jugador_a = st.selectbox("Jugador A", lista)
 jugador_b = st.selectbox("Jugador B", lista)
 
 cuota = st.number_input("Cuota", value=2.0)
-bankroll = st.number_input("Bankroll", value=100.0)
 
 # =========================
-# PROBABILIDAD (ELO + RACHA)
+# PROBABILIDAD PRO
 # =========================
 def probabilidad(elo_a, elo_b, racha_a, racha_b):
     base = 1 / (1 + 10 ** ((elo_b - elo_a) / 400))
-    ajuste = (racha_a - racha_b) * 0.01
+    ajuste = (racha_a - racha_b) * 0.015
     return max(0, min(1, base + ajuste))
 
 # =========================
 # ANALIZAR
 # =========================
-if st.button("Analizar"):
+if st.button("Analizar apuesta"):
     elo_a = jugadores[jugador_a]["elo"]
     elo_b = jugadores[jugador_b]["elo"]
 
@@ -88,62 +89,83 @@ if st.button("Analizar"):
     valor = (p * cuota) - 1
 
     st.subheader("📊 Resultado")
+
     st.write(f"Probabilidad: {p*100:.2f}%")
     st.write(f"Valor esperado: {valor:.2f}")
 
-    if valor > 0:
-        apuesta = bankroll * (valor / cuota)
-        st.success("✅ Apuesta con valor")
-        st.write(f"Apuesta recomendada: ${apuesta:.2f}")
+    # 🤖 RECOMENDACIÓN IA
+    if p > 0.6 and valor > 0:
+        st.success("🤖 IA: Apuesta FUERTE")
+    elif p > 0.5:
+        st.info("🤖 IA: Apuesta moderada")
     else:
-        st.error("❌ No apostar")
+        st.error("🤖 IA: No apostar")
+
+    # Kelly
+    if valor > 0:
+        apuesta = saldo * (valor / cuota)
+        st.write(f"💸 Apuesta sugerida: ${apuesta:.2f}")
+    else:
+        apuesta = 0
 
     # =========================
-    # GUARDAR EN HISTORIAL
+    # RESULTADO REAL
     # =========================
-    registro = {
-        "jugador_a": jugador_a,
-        "jugador_b": jugador_b,
-        "probabilidad": round(p, 4),
-        "valor": round(valor, 4),
-        "cuota": cuota
-    }
+    resultado = st.radio("Resultado real", ["Pendiente", "Ganada", "Perdida"])
 
-    historial.append(registro)
+    if st.button("Guardar resultado"):
+        if resultado != "Pendiente":
 
-    with open("historial.json", "w") as f:
-        json.dump(historial, f)
+            if resultado == "Ganada":
+                ganancia = apuesta * (cuota - 1)
+                saldo += ganancia
+            else:
+                saldo -= apuesta
+
+            # Guardar bankroll
+            json.dump({"saldo": saldo}, open("bankroll.json", "w"))
+
+            # Guardar historial
+            historial.append({
+                "jugador_a": jugador_a,
+                "jugador_b": jugador_b,
+                "probabilidad": round(p, 3),
+                "valor": round(valor, 3),
+                "cuota": cuota,
+                "apuesta": round(apuesta, 2),
+                "resultado": resultado,
+                "saldo": round(saldo, 2)
+            })
+
+            json.dump(historial, open("historial.json", "w"))
+
+            st.success("Resultado guardado 🔥")
 
 # =========================
 # HISTORIAL
 # =========================
-st.subheader("📜 Historial")
+st.subheader("📜 Historial de apuestas")
 
-if len(historial) > 0:
+if historial:
     df = pd.DataFrame(historial)
     st.dataframe(df)
+
+    st.subheader("📈 Evolución del bankroll")
+    st.line_chart(df["saldo"])
 else:
-    st.write("Sin datos aún")
+    st.write("Sin apuestas aún")
 
 # =========================
-# RANKING
+# RANKING PRO
 # =========================
-st.subheader("🏆 Ranking de jugadores")
+st.subheader("🏆 Ranking inteligente")
 
 ranking = []
 
 for nombre, datos in jugadores.items():
-    score = datos["elo"] + (datos["racha"] * 10)
+    score = datos["elo"] + (datos["racha"] * 15)
     ranking.append({"Jugador": nombre, "Score": score})
 
 df_rank = pd.DataFrame(ranking).sort_values(by="Score", ascending=False)
 
 st.dataframe(df_rank)
-
-# =========================
-# GRÁFICO SIMPLE
-# =========================
-if len(historial) > 0:
-    st.subheader("📈 Evolución del valor")
-    valores = [h["valor"] for h in historial]
-    st.line_chart(valores)
