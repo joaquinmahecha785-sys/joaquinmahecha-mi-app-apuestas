@@ -2,123 +2,127 @@ import streamlit as st
 import json
 import os
 
-st.set_page_config(page_title="App PRO Apuestas", layout="centered")
+st.set_page_config(page_title="App PRO de Apuestas", layout="centered")
 
-st.title("🔥 App PRO con Forma Real")
+st.title("💰 App PRO de Apuestas")
 
-# =========================
-# CREAR ARCHIVO SI NO EXISTE
-# =========================
+# =====================================
+# 📁 Cargar o crear archivo jugadores.json
+# =====================================
 if not os.path.exists("jugadores.json"):
     jugadores = {
-        "Jugador A": {"elo": 1500, "historial": [1,0,1,1,0]},
-        "Jugador B": {"elo": 1450, "historial": [0,1,0,0,1]}
+        "Jugador A": {"elo": 1500, "historial": ["W", "L", "W"]},
+        "Jugador B": {"elo": 1450, "historial": ["L", "L", "W"]}
     }
-    json.dump(jugadores, open("jugadores.json", "w"))
+    with open("jugadores.json", "w") as f:
+        json.dump(jugadores, f, indent=4)
+else:
+    with open("jugadores.json", "r") as f:
+        jugadores = json.load(f)
 
-# =========================
-# CARGAR
-# =========================
-jugadores = json.load(open("jugadores.json"))
+# =====================================
+# ➕ Agregar nuevo jugador
+# =====================================
+st.subheader("➕ Agregar jugador")
 
-# =========================
-# FUNCIONES
-# =========================
-def calcular_forma(historial):
-    ultimos = historial[-5:]
-    return sum(ultimos)
+nuevo_nombre = st.text_input("Nombre del jugador")
 
-def probabilidad(elo_a, elo_b, forma_a, forma_b):
-    base = 1 / (1 + 10 ** ((elo_b - elo_a) / 400))
-    ajuste = (forma_a - forma_b) * 0.03
-    return max(0, min(1, base + ajuste))
+if st.button("Agregar jugador"):
+    if nuevo_nombre and nuevo_nombre not in jugadores:
+        jugadores[nuevo_nombre] = {
+            "elo": 1500,
+            "historial": []
+        }
+        with open("jugadores.json", "w") as f:
+            json.dump(jugadores, f, indent=4)
+        st.success(f"{nuevo_nombre} agregado")
+    else:
+        st.warning("Nombre inválido o ya existe")
 
-def mostrar_forma(nombre):
-    historial = jugadores[nombre]["historial"][-5:]
-    texto = ""
-    for r in historial:
-        if r == 1:
-            texto += "🟢 "
-        else:
-            texto += "🔴 "
-    st.write(f"{nombre}: {texto}")
+# =====================================
+# 📊 Selección de jugadores
+# =====================================
+st.subheader("⚔️ Partido")
 
-# =========================
-# AGREGAR JUGADOR
-# =========================
-st.subheader("➕ Nuevo jugador")
+lista_jugadores = list(jugadores.keys())
 
-nombre = st.text_input("Nombre")
-elo = st.number_input("ELO", value=1500)
-
-if st.button("Guardar jugador"):
-    if nombre != "":
-        jugadores[nombre] = {"elo": elo, "historial": []}
-        json.dump(jugadores, open("jugadores.json", "w"))
-        st.success("Jugador creado")
-
-# =========================
-# VALIDACIÓN
-# =========================
-if len(jugadores) < 2:
-    st.warning("Agrega al menos 2 jugadores")
-    st.stop()
-
-# =========================
-# SELECCIÓN
-# =========================
-st.subheader("🎯 Análisis")
-
-lista = list(jugadores.keys())
-
-jugador_a = st.selectbox("Jugador A", lista)
-jugador_b = st.selectbox("Jugador B", lista)
+jugador_a = st.selectbox("Jugador A", lista_jugadores)
+jugador_b = st.selectbox("Jugador B", lista_jugadores)
 
 cuota = st.number_input("Cuota", value=2.0)
+bankroll = st.number_input("Bankroll", value=100.0)
 
-# =========================
-# MOSTRAR FORMA
-# =========================
+# =====================================
+# 📈 Mostrar forma reciente
+# =====================================
+def mostrar_forma(nombre):
+    if nombre not in jugadores:
+        st.warning(f"No hay datos para {nombre}")
+        return
+
+    historial = jugadores[nombre].get("historial", [])
+
+    st.write(f"Forma de {nombre}:")
+
+    if not historial:
+        st.info("Sin historial aún")
+        return
+
+    for r in historial[-5:]:
+        if r == "W":
+            st.success("✅ Victoria")
+        else:
+            st.error("❌ Derrota")
+
+# Mostrar forma
 st.subheader("📊 Forma reciente")
-
 mostrar_forma(jugador_a)
 mostrar_forma(jugador_b)
 
-# =========================
-# CALCULAR
-# =========================
+# =====================================
+# 🧠 Cálculo simple (puedes mejorar luego)
+# =====================================
+def calcular_probabilidad(a, b):
+    elo_a = jugadores[a]["elo"]
+    elo_b = jugadores[b]["elo"]
+
+    prob = 1 / (1 + 10 ** ((elo_b - elo_a) / 400))
+    return prob
+
+# =====================================
+# 🎯 Análisis
+# =====================================
 if st.button("Analizar"):
-    forma_a = calcular_forma(jugadores[jugador_a]["historial"])
-    forma_b = calcular_forma(jugadores[jugador_b]["historial"])
+    prob = calcular_probabilidad(jugador_a, jugador_b)
 
-    elo_a = jugadores[jugador_a]["elo"]
-    elo_b = jugadores[jugador_b]["elo"]
+    valor_esperado = (prob * cuota) - 1
+    apuesta = bankroll * (valor_esperado / cuota) if valor_esperado > 0 else 0
 
-    p = probabilidad(elo_a, elo_b, forma_a, forma_b)
-    valor = (p * cuota) - 1
+    st.subheader("Resultado")
+    st.write(f"Probabilidad de ganar: {round(prob*100,2)}%")
+    st.write(f"Valor esperado: {round(valor_esperado,2)}")
 
-    st.subheader("📈 Resultado")
-    st.write(f"Probabilidad: {p*100:.2f}%")
-    st.write(f"Valor esperado: {valor:.2f}")
-
-    if valor > 0:
+    if valor_esperado > 0:
         st.success("✅ Apuesta con valor")
+        st.write(f"Apuesta recomendada: ${round(apuesta,2)}")
     else:
         st.error("❌ No apostar")
 
-# =========================
-# REGISTRAR PARTIDO
-# =========================
-st.subheader("📝 Registrar resultado")
+# =====================================
+# ➕ Agregar resultado (mejora PRO)
+# =====================================
+st.subheader("📌 Registrar resultado")
 
-jugador = st.selectbox("Jugador", lista)
-resultado = st.radio("Resultado", ["Ganó", "Perdió"])
+resultado_jugador = st.selectbox("Jugador", lista_jugadores)
+resultado = st.selectbox("Resultado", ["W", "L"])
 
 if st.button("Guardar resultado"):
-    if resultado == "Ganó":
-        jugadores[jugador]["historial"].append(1)
-    else:
-        jugadores[jugador]["historial"].append(0)
+    jugadores[resultado_jugador]["historial"].append(resultado)
 
-    json.dump(jugadores, open("jugadores.json", "w"))
+    # Limitar a últimos 10
+    jugadores[resultado_jugador]["historial"] = jugadores[resultado_jugador]["historial"][-10:]
+
+    with open("jugadores.json", "w") as f:
+        json.dump(jugadores, f, indent=4)
+
     st.success("Resultado guardado")
