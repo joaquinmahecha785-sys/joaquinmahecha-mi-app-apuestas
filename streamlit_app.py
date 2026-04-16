@@ -1,39 +1,3 @@
-import streamlit as st
-import json
-import os
-
-# =========================
-# CONFIGURACIÓN
-# =========================
-st.set_page_config(page_title="App PRO de Apuestas", layout="centered")
-
-st.title("💰 App PRO de Apuestas")
-
-# =========================
-# CARGAR O CREAR JUGADORES
-# =========================
-if not os.path.exists("jugadores.json"):
-    jugadores = {
-        "Jugador A": {"elo": 1500, "racha": 0},
-        "Jugador B": {"elo": 1450, "racha": 0}
-    }
-    with open("jugadores.json", "w") as f:
-        json.dump(jugadores, f)
-else:
-    with open("jugadores.json", "r") as f:
-        jugadores = json.load(f)
-
-# =========================
-# AGREGAR JUGADORES
-# =========================
-st.subheader("➕ Agregar nuevo jugador")
-
-nombre = st.text_input("Nombre del jugador")
-elo = st.number_input("ELO", value=1500)
-racha = st.number_input("Racha", value=0)
-
-if st.button("Guardar jugador"):
-    if nombre != "":
         jugadores[nombre] = {"elo": elo, "racha": racha}
         with open("jugadores.json", "w") as f:
             json.dump(jugadores, f)
@@ -75,3 +39,4 @@ if st.button("Analizar"):
         st.write(f"Apuesta recomendada: ${apuesta:.2f}")
     else:
         st.error("❌ No apostar")
+        
