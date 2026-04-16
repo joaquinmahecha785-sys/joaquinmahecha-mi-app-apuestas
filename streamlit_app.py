@@ -3,10 +3,8 @@ import streamlit as st
 st.title("💰 App de Apuestas")
 
 # Base de jugadores
-jugadores = {
-    "Jugador A": {"elo": 1500},
-    "Jugador B": {"elo": 1450},
-    "Jugador C": {"elo": 1550},
+jugador_a = st.selectbox("Jugador A", list(jugadores.keys()))
+jugador_b = st.selectbox("Jugador B", list(jugadores.keys()))
 }
 
 # Selección
