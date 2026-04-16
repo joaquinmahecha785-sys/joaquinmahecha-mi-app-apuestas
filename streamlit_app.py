@@ -1,70 +1,126 @@
+import streamlit as st
 import json
-import streamlit as st import streamlit as st
+import os
+
+st.set_page_config(page_title="App PRO de Apuestas", layout="centered")
 
 st.title("💰 App PRO de Apuestas")
 
-# Base de jugadores (mejorada)
-jugadores = {
-    "Jugador A": {"elo": 1500, "racha": 3},
-    "Jugador B": {"elo": 1450, "racha": -1},
-    "Jugador C": {"elo": 1550, "racha": 5},
-}
+# ==========================
+# Cargar o crear jugadores.json automáticamente
+# ==========================
+if not os.path.exists("jugadores.json"):
+    jugadores = {
+        "Jugador A": {"elo": 1500, "racha": 0},
+        "Jugador B": {"elo": 1450, "racha": 0}
+    }
+    with open("jugadores.json", "w") as f:
+        json.dump(jugadores, f)
+else:
+    try:
+        with open("jugadores.json", "r") as f:
+            jugadores = json.load(f)
+    except:
+        jugadores = {}
 
-# Selección
-jugador_a = st.selectbox("Jugador A", list(jugadores.keys()))
-jugador_b = st.selectbox("Jugador B", list(jugadores.keys()))
+# ==========================
+# Validación si no hay jugadores
+# ==========================
+if len(jugadores) == 0:
+    st.warning("No hay jugadores guardados. Agrega uno abajo 👇")
 
-cuota = st.number_input("Cuota", value=2.0)
-bankroll = st.number_input("Bankroll", value=100.0)
+# ==========================
+# Selección de jugadores
+# ==========================
+st.subheader("🎮 Selección de jugadores")
 
-# Ajuste por racha
-def elo_ajustado(elo, racha):
-    return elo + (racha * 20)
+lista_jugadores = list(jugadores.keys())
 
-# Probabilidad
-def probabilidad(elo_a, elo_b):
-    return 1 / (1 + 10 ** ((elo_b - elo_a) / 400))
+if len(lista_jugadores) > 0:
+    jugador_a = st.selectbox("Jugador A", lista_jugadores)
+    jugador_b = st.selectbox("Jugador B", lista_jugadores)
+else:
+    jugador_a = None
+    jugador_b = None
 
-# Botón
-if st.button("Analizar"):
-    elo_a = elo_ajustado(jugadores[jugador_a]["elo"], jugadores[jugador_a]["racha"])
-    elo_b = elo_ajustado(jugadores[jugador_b]["elo"], jugadores[jugador_b]["racha"])
+# ==========================
+# Inputs
+# ==========================
+st.subheader("📊 Datos de apuesta")
 
-    prob = probabilidad(elo_a, elo_b)
+cuota = st.number_input("Cuota", value=2.00)
+bankroll = st.number_input("Bankroll", value=100.00)
 
-    valor = (prob * cuota) - 1
+# ==========================
+# Cálculo
+# ==========================
+if jugador_a and jugador_b:
 
-    # Kelly conservador (50%)
-    kelly = ((prob * cuota) - 1) / (cuota - 1)
-    apuesta = bankroll * max(kelly * 0.5, 0)
+    if jugador_a != jugador_b:
 
-    st.subheader("Resultado")
+        elo_a = jugadores[jugador_a]["elo"]
+        elo_b = jugadores[jugador_b]["elo"]
 
-    st.write(f"Probabilidad ajustada: {prob:.2%}")
-    st.write(f"Valor esperado: {valor:.2f}")
+        racha_a = jugadores[jugador_a]["racha"]
+        racha_b = jugadores[jugador_b]["racha"]
 
-    if valor > 0:
-        st.success("✅ Apuesta con valor")
+        # Probabilidad con ELO
+        prob = 1 / (1 + 10 ** ((elo_b - elo_a) / 400))
+
+        # Ajuste por racha
+        prob += (racha_a - racha_b) * 0.01
+
+        prob = max(0, min(prob, 1))
+
+        # Valor esperado
+        valor_esperado = (prob * cuota) - 1
+
+        # Kelly
+        kelly = ((prob * cuota) - 1) / (cuota - 1)
+        kelly = max(0, kelly)
+
+        apuesta = bankroll * kelly
+
+        # ==========================
+        # Mostrar resultado
+        # ==========================
+        st.subheader("📈 Resultado")
+
+        st.write(f"Probabilidad de ganar: {prob*100:.2f}%")
+        st.write(f"Valor esperado: {valor_esperado:.2f}")
+
+        if valor_esperado > 0:
+            st.success("✅ Apuesta con valor")
+        else:
+            st.error("❌ Apuesta sin valor")
+
         st.write(f"Apuesta recomendada: ${apuesta:.2f}")
+
     else:
-        st.error("❌ No vale la pena apostar")
+        st.warning("Selecciona jugadores diferentes")
+
+# ==========================
+# Agregar jugadores
+# ==========================
 st.subheader("➕ Agregar jugador")
 
-if "jugadores" not in st.session_state:
-    st.session_state.jugadores = {
-        "Jugador A": {"elo": 1500, "racha": 3},
-        "Jugador B": {"elo": 1450, "racha": -1},
-    }
+nombre_nuevo = st.text_input("Nombre del jugador")
+elo_nuevo = st.number_input("ELO inicial", value=1500)
+racha_nueva = st.number_input("Racha", value=0)
 
-nombre = st.text_input("Nombre del jugador")
-elo = st.number_input("ELO", value=1500)
-racha = st.number_input("Racha", value=0)
+if st.button("Guardar jugador"):
 
-if st.button("Agregar jugador"):
-    if nombre != "":
-        st.session_state.jugadores[nombre] = {
-            "elo": elo,
-            "racha": racha
+    if nombre_nuevo.strip() != "":
+        jugadores[nombre_nuevo] = {
+            "elo": elo_nuevo,
+            "racha": racha_nueva
         }
-        st.success(f"{nombre} agregado correctamente")
 
+        with open("jugadores.json", "w") as f:
+            json.dump(jugadores, f, indent=4)
+
+        st.success(f"Jugador {nombre_nuevo} guardado ✅")
+        st.rerun()
+
+    else:
+        st.error("Escribe un nombre válido")
