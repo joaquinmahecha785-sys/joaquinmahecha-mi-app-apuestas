@@ -2,22 +2,45 @@ import streamlit as st
 
 st.title("💰 App de Apuestas")
 
-jugadores = ["Jugador A", "Jugador B"]
+# Base de jugadores
+jugadores = {
+    "Jugador A": {"elo": 1500},
+    "Jugador B": {"elo": 1450},
+    "Jugador C": {"elo": 1550},
+}
 
-jugador_a = st.selectbox("Jugador A", jugadores)
-jugador_b = st.selectbox("Jugador B", jugadores)
+# Selección
+jugador_a = st.selectbox("Jugador A", list(jugadores.keys()))
+jugador_b = st.selectbox("Jugador B", list(jugadores.keys()))
 
-cuota = st.number_input("Cuota", min_value=1.0, value=2.0)
-bankroll = st.number_input("Bankroll", min_value=1.0, value=100.0)
+cuota = st.number_input("Cuota", value=2.0)
+bankroll = st.number_input("Bankroll", value=100.0)
 
+# Función probabilidad (ELO)
+def probabilidad(elo_a, elo_b):
+    return 1 / (1 + 10 ** ((elo_b - elo_a) / 400))
+
+# Botón
 if st.button("Analizar"):
-    prob = 0.55
-    prob_casa = 1 / cuota
+    elo_a = jugadores[jugador_a]["elo"]
+    elo_b = jugadores[jugador_b]["elo"]
 
-    st.write(f"Probabilidad modelo: {prob}")
-    st.write(f"Probabilidad casa: {prob_casa}")
+    prob = probabilidad(elo_a, elo_b)
 
-    if prob > prob_casa:
-        st.success("✅ APOSTAR")
+    # Valor esperado
+    valor = (prob * cuota) - 1
+
+    # Kelly simplificado
+    kelly = ((prob * cuota) - 1) / (cuota - 1)
+    apuesta = bankroll * max(kelly, 0)
+
+    st.subheader("Resultado")
+
+    st.write(f"Probabilidad de ganar: {prob:.2%}")
+    st.write(f"Valor esperado: {valor:.2f}")
+
+    if valor > 0:
+        st.success("✅ Apuesta con valor")
+        st.write(f"Apuesta recomendada: ${apuesta:.2f}")
     else:
-        st.error("❌ No hay valor")
+        st.error("❌ No vale la pena apostar")
