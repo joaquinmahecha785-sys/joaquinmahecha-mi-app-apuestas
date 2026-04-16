@@ -67,3 +67,4 @@ if st.button("Agregar jugador"):
             "racha": racha
         }
         st.success(f"{nombre} agregado correctamente")
+        
