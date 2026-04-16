@@ -44,3 +44,4 @@ if st.button("Analizar"):
         st.write(f"Apuesta recomendada: ${apuesta:.2f}")
     else:
         st.error("❌ No vale la pena apostar")
+        
