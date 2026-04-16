@@ -45,3 +45,22 @@ if st.button("Analizar"):
     else:
         st.error("❌ No vale la pena apostar")
         
+st.subheader("➕ Agregar jugador")
+
+if "jugadores" not in st.session_state:
+    st.session_state.jugadores = {
+        "Jugador A": {"elo": 1500, "racha": 3},
+        "Jugador B": {"elo": 1450, "racha": -1},
+    }
+
+nombre = st.text_input("Nombre del jugador")
+elo = st.number_input("ELO", value=1500)
+racha = st.number_input("Racha", value=0)
+
+if st.button("Agregar jugador"):
+    if nombre != "":
+        st.session_state.jugadores[nombre] = {
+            "elo": elo,
+            "racha": racha
+        }
+        st.success(f"{nombre} agregado correctamente")
