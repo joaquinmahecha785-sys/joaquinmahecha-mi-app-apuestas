@@ -1,155 +1,101 @@
-import streamlit as st
-import json
-import os
-
-st.set_page_config(page_title="App PRO de Apuestas", layout="centered")
-
-st.title("💰 App PRO de Apuestas")
+# =====================================
+# 📊 DATOS DE JUGADORES (EJEMPLO REAL)
+# =====================================
+jugadores = {
+    "Ondrej Fiklik": {"elo": 1590, "historial": ["W","W","L","W","W"]},
+    "Miloslav Lubas": {"elo": 1540, "historial": ["L","W","L","W","L"]},
+    "Petr David": {"elo": 1600, "historial": ["W","W","W","L","W"]},
+    "Tomas Konecny": {"elo": 1620, "historial": ["W","L","W","W","W"]},
+    "Jiri Martinko": {"elo": 1580, "historial": ["L","L","W","W","L"]}
+}
 
 # =====================================
-# 📁 Cargar o crear JSON
+# 🧠 1. FORMA PONDERADA (CLAVE)
 # =====================================
-if not os.path.exists("jugadores.json"):
-    jugadores = {
-        "Jugador A": {"elo": 1500, "historial": ["W", "L", "W"]},
-        "Jugador B": {"elo": 1450, "historial": ["L", "L", "W"]}
-    }
-    with open("jugadores.json", "w") as f:
-        json.dump(jugadores, f, indent=4)
-else:
-    with open("jugadores.json", "r") as f:
-        jugadores = json.load(f)
+def calcular_forma(historial):
+    puntos = 0
+    peso = 1
+
+    # últimos partidos pesan más
+    for resultado in reversed(historial):
+        if resultado == "W":
+            puntos += peso
+        peso += 1
+
+    return puntos
+
 
 # =====================================
-# 🛠️ ARREGLAR DATOS AUTOMÁTICAMENTE
+# 📈 2. PROBABILIDAD (ELO + FORMA)
 # =====================================
-for nombre in jugadores:
-    if "historial" not in jugadores[nombre] or not isinstance(jugadores[nombre]["historial"], list):
-        jugadores[nombre]["historial"] = []
-    if "elo" not in jugadores[nombre]:
-        jugadores[nombre]["elo"] = 1500
+def calcular_probabilidad(jugador_a, jugador_b):
+    elo_a = jugadores[jugador_a]["elo"]
+    elo_b = jugadores[jugador_b]["elo"]
 
-# =====================================
-# 📊 FUNCIONES PRO
-# =====================================
-def calcular_winrate(historial):
-    if not historial or not isinstance(historial, list):
-        return 0
-    return historial.count("W") / len(historial)
+    forma_a = calcular_forma(jugadores[jugador_a]["historial"])
+    forma_b = calcular_forma(jugadores[jugador_b]["historial"])
 
-def calcular_probabilidad(a, b):
-    elo_a = jugadores[a]["elo"]
-    elo_b = jugadores[b]["elo"]
-
+    # probabilidad base ELO
     base = 1 / (1 + 10 ** ((elo_b - elo_a) / 400))
 
-    forma_a = calcular_winrate(jugadores[a].get("historial", [])[-5:])
-    forma_b = calcular_winrate(jugadores[b].get("historial", [])[-5:])
+    # ajuste por forma
+    ajuste = (forma_a - forma_b) * 0.02
 
-    ajuste = (forma_a - forma_b) * 0.2
+    prob = base + ajuste
 
-    return max(0.01, min(0.99, base + ajuste))
+    # limitar entre 1% y 99%
+    return max(0.01, min(0.99, prob))
 
-# =====================================
-# ➕ AGREGAR JUGADOR
-# =====================================
-st.subheader("➕ Agregar jugador")
-
-nuevo = st.text_input("Nombre")
-
-if st.button("Agregar"):
-    if nuevo and nuevo not in jugadores:
-        jugadores[nuevo] = {"elo": 1500, "historial": []}
-        with open("jugadores.json", "w") as f:
-            json.dump(jugadores, f, indent=4)
-        st.success("Jugador agregado")
-    else:
-        st.warning("Nombre inválido o repetido")
 
 # =====================================
-# 🏆 RANKING (CORREGIDO)
+# 💰 3. VALOR ESPERADO
 # =====================================
-st.subheader("🏆 Ranking")
+def calcular_valor(probabilidad, cuota):
+    return (probabilidad * cuota) - 1
 
-ranking = sorted(
-    jugadores.items(),
-    key=lambda x: calcular_winrate(x[1].get("historial", [])),
-    reverse=True
-)
-
-for i, (nombre, data) in enumerate(ranking[:5], start=1):
-    winrate = calcular_winrate(data.get("historial", []))
-    st.write(f"{i}. {nombre} - {round(winrate*100,1)}%")
 
 # =====================================
-# ⚔️ PARTIDO
+# 💸 4. APUESTA (KELLY SIMPLIFICADO)
 # =====================================
-st.subheader("⚔️ Analizar partido")
+def calcular_apuesta(bankroll, probabilidad, cuota):
+    valor = calcular_valor(probabilidad, cuota)
 
-lista = list(jugadores.keys())
+    if valor <= 0:
+        return 0
 
-jugador_a = st.selectbox("Jugador A", lista)
-jugador_b = st.selectbox("Jugador B", lista)
+    kelly = valor / (cuota - 1)
+    return bankroll * kelly
 
-cuota = st.number_input("Cuota", value=2.0)
-bankroll = st.number_input("Bankroll", value=100.0)
-
-# =====================================
-# 📈 FORMA
-# =====================================
-def mostrar_forma(nombre):
-    historial = jugadores.get(nombre, {}).get("historial", [])
-
-    st.write(f"Forma de {nombre}")
-
-    if not historial:
-        st.info("Sin datos")
-        return
-
-    valores = [1 if x == "W" else 0 for x in historial[-10:]]
-
-    st.line_chart(valores)
-
-    winrate = calcular_winrate(historial)
-    st.write(f"Winrate: {round(winrate*100,2)}%")
-
-st.subheader("📊 Forma reciente")
-mostrar_forma(jugador_a)
-mostrar_forma(jugador_b)
 
 # =====================================
-# 🎯 ANÁLISIS
+# 🔍 5. ANÁLISIS COMPLETO
 # =====================================
-if st.button("Analizar"):
+def analizar_partido(jugador_a, jugador_b, cuota, bankroll):
+
     prob = calcular_probabilidad(jugador_a, jugador_b)
+    valor = calcular_valor(prob, cuota)
+    apuesta = calcular_apuesta(bankroll, prob, cuota)
 
-    valor = (prob * cuota) - 1
-    apuesta = bankroll * valor if valor > 0 else 0
-
-    st.subheader("Resultado")
-    st.write(f"Probabilidad: {round(prob*100,2)}%")
-    st.write(f"Valor esperado: {round(valor,2)}")
+    print("=====================================")
+    print(f"Partido: {jugador_a} vs {jugador_b}")
+    print(f"Probabilidad: {prob*100:.2f}%")
+    print(f"Valor esperado: {valor:.2f}")
 
     if valor > 0:
-        st.success("✅ Apuesta con valor")
-        st.write(f"Apuesta recomendada: ${round(apuesta,2)}")
+        print("✅ Apuesta con valor")
+        print(f"Apuesta recomendada: ${apuesta:.2f}")
     else:
-        st.error("❌ No apostar")
+        print("❌ No apostar")
+
+    print("=====================================")
+
 
 # =====================================
-# 📌 REGISTRAR RESULTADO
+# ▶️ EJEMPLO DE USO
 # =====================================
-st.subheader("📌 Registrar resultado")
-
-jugador_res = st.selectbox("Jugador", lista)
-resultado = st.selectbox("Resultado", ["W", "L"])
-
-if st.button("Guardar resultado"):
-    jugadores[jugador_res]["historial"].append(resultado)
-
-    jugadores[jugador_res]["historial"] = jugadores[jugador_res]["historial"][-20:]
-
-    with open("jugadores.json", "w") as f:
-        json.dump(jugadores, f, indent=4)
-
-    st.success("Guardado correctamente")
+analizar_partido(
+    "Ondrej Fiklik",
+    "Miloslav Lubas",
+    cuota=2.0,
+    bankroll=100
+)
